@@ -27,7 +27,7 @@ grid_object = {
     
 
 class Grid:
-    def __init__(self, width, height):
+    def __init__(self, width, height, speed):
         self.width = width
         self.height = height
         self.grid = [[(grid_object['NONE'], -1) for _ in range(height)] for _ in range(width)]
@@ -43,6 +43,13 @@ class Grid:
         # self.grid[50][100] = (grid_object['SNAKE'], 5)
 
         self.grid[x2][y2] = (grid_object['FOOD'], -1)
+        self.food = (x2, y2)
+        self.food_on_timer = 0
+        self.food_off_timer = 10
+
+        self.frame = 0
+        self.speed = speed
+
         
     def in_bounds(self, x, y):
         if x < 0 or x >= self.width:
@@ -57,13 +64,13 @@ class Grid:
         self.running = False
 
     def start(self):
-        direction = self.get_player_direction()
+        direction = (0, 0)
         self.render()
         pygame.display.update()
         
         
         while(direction == (0, 0)):
-            temp = self.get_player_direction()
+            temp = get_player_direction()
             if temp == (0, 0):
                 pass
             elif self.in_bounds(self.snake_head[0] + temp[0], self.snake_head[1] + temp[1]):
@@ -83,6 +90,28 @@ class Grid:
             chosenOne = random.choice(free)
             self.grid[chosenOne[0]][chosenOne[1]] = (grid_object['FOOD'], -1)
 
+    def move_food(self):
+        print(self.food_on_timer, self.food_off_timer)
+        if self.food_off_timer == 0:
+            self.food_on_timer -= 1
+            if self.food_on_timer <= 0:
+                self.food_off_timer = 100
+                self.food_on_timer = 10
+
+            free = []
+            search = [-1, 0, 1]
+            for column in search:
+                for row in search:
+                    if self.in_bounds(self.food[0] + column, self.food[1] + row):
+                        if not self.grid[self.food[0] + column][self.food[1] + row][1] > 0:
+                            free.append((self.food[0] + column, self.food[1] + row))
+            if len(free):
+                chosenOne = random.choice(free)
+                self.grid[self.food[0]][self.food[1]] = (grid_object['NONE'], -1)
+                self.food = (chosenOne[0], chosenOne[1])
+                self.grid[chosenOne[0]][chosenOne[1]] = (grid_object['FOOD'], -1)
+        else:
+            self.food_off_timer -= 1
 
     def grow(self, x, y, current_length):
         self.grid[x][y] = (grid_object['SNAKE'], current_length + 3)
@@ -104,28 +133,6 @@ class Grid:
             self.grow(self.snake_head[0], self.snake_head[1], self.grid[self.snake_head[0]][self.snake_head[1]][1])
             self.respawn_food()
 
-    def get_player_direction(self):
-        
-        x_direciton = 0
-        y_direciton = 0
-
-        for event in pygame.event.get():  # User did something
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_DOWN:
-                    y_direciton = 1
-                    x_direciton = 0
-                if event.key == pygame.K_UP:
-                    y_direciton = -1
-                    x_direciton = 0
-                if event.key == pygame.K_LEFT:
-                    y_direciton = 0
-                    x_direciton = -1
-                if event.key == pygame.K_RIGHT:
-                    y_direciton = 0
-                    x_direciton = 1
-
-        return (x_direciton, y_direciton)
-
     def update_snake(self, x_direction, y_direction):
         # update head
         x = self.snake_head[0]
@@ -140,16 +147,11 @@ class Grid:
         
         # decrement body
         for segment in range(size):
-            print("Segment: ", segment)
-            print("val before: ", self.grid[x][y][1])
             val = self.grid[x][y][1] - 1
             if val == 0:
                 self.grid[x][y] = (grid_object["NONE"], -1)
             else:
                 self.grid[x][y] = (grid_object["SNAKE"], val)
-
-            print("val after: ", self.grid[x][y][1])
-            
 
             next_x = x
             next_y = y
@@ -166,51 +168,54 @@ class Grid:
                         next_y = y + del_y
                         break
 
-            print("next_val seek", val, " x: ", next_x, " y: ", next_y)
-
             if next_x == x and next_y == y:
                 break
             else:
                 x = next_x
                 y = next_y
-            
-
-        
 
     def advance_frame(self):
-        player_direction = self.get_player_direction()
-
-        x = self.snake_head[0]
-        y = self.snake_head[1]
-        size = self.grid[self.snake_head[0]][self.snake_head[1]][1]
-
-        neighbour = (-1, 1)
-            
-        for del_x in neighbour:
-            if  self.in_bounds(x + del_x, y):
-                if self.grid[x + del_x][y][1] == size - 1:
-                    x = x + del_x
-                    break
-
-        for del_y in neighbour:
-            if self.in_bounds(x, y + del_y):
-                if self.grid[x][y + del_y][1] == size - 1:
-                    y = y + del_y
-                    break
-
-        snake_body_direction = (x - self.snake_head[0], y - self.snake_head[1])
-
-        if snake_body_direction == player_direction or player_direction[0] == player_direction[1]:
-            x_dir = snake_body_direction[0] * -1
-            y_dir = snake_body_direction[1] * -1
-        else:
-            x_dir = player_direction[0]
-            y_dir = player_direction[1]
-            
-        self.check_collision(x_dir, y_dir)
+        self.frame += 1
+        
         
         if self.running:
-            self.update_snake(x_dir, y_dir)
+            self.move_food()
+            if self.frame == self.speed:
+                global x_direction
+                global y_direction
+                player_direction = (x_direction, y_direction)
+
+                x = self.snake_head[0]
+                y = self.snake_head[1]
+                size = self.grid[self.snake_head[0]][self.snake_head[1]][1]
+
+                neighbour = (-1, 1)
+                    
+                for del_x in neighbour:
+                    if  self.in_bounds(x + del_x, y):
+                        if self.grid[x + del_x][y][1] == size - 1:
+                            x = x + del_x
+                            break
+
+                for del_y in neighbour:
+                    if self.in_bounds(x, y + del_y):
+                        if self.grid[x][y + del_y][1] == size - 1:
+                            y = y + del_y
+                            break
+
+                snake_body_direction = (x - self.snake_head[0], y - self.snake_head[1])
+
+                if snake_body_direction == player_direction or player_direction[0] == player_direction[1]:
+                    x_dir = snake_body_direction[0] * -1
+                    y_dir = snake_body_direction[1] * -1
+                else:
+                    x_dir = player_direction[0]
+                    y_dir = player_direction[1]
+                    
+                self.check_collision(x_dir, y_dir)
+                if self.running:
+                    self.update_snake(x_dir, y_dir)
+                self.frame = 0
 
         self.render()
         
@@ -226,14 +231,36 @@ class Grid:
                 else:
                     pygame.draw.rect(screen, (0, 0, 0), [column*pixel_width, row*pixel_width, pixel_width, pixel_width])
 
-        pygame.draw.rect(screen, (254, 254, 0), [self.snake_head[0]*pixel_width, self.snake_head[1]*pixel_width, pixel_width, pixel_width])
+        pygame.draw.rect(screen, (254, 100, 0), [self.snake_head[0]*pixel_width, self.snake_head[1]*pixel_width, pixel_width, pixel_width])
+
+def get_player_direction():
+
+    global x_direction
+    global y_direction
+
+    for event in pygame.event.get():  # User did something
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_DOWN:
+                y_direction = 1
+                x_direction = 0
+            if event.key == pygame.K_UP:
+                y_direction = -1
+                x_direction = 0
+            if event.key == pygame.K_LEFT:
+                y_direction = 0
+                x_direction = -1
+            if event.key == pygame.K_RIGHT:
+                y_direction = 0
+                x_direction = 1
+
+    return (x_direction, y_direction)
 
 
-
-
-pixel_width = 10
-width = 100
-height = 100
+pixel_width = 20
+width = 30
+height = 30
+x_direction = 0
+y_direction = 0
 
 pygame.init()
 clock = pygame.time.Clock()
@@ -241,13 +268,14 @@ done = False
 
 screen = pygame.display.set_mode(((width * pixel_width), (height * pixel_width)))
    
-grid = Grid(width, height)
+grid = Grid(width, height, 8)
 grid.start()
 
 while not done:
     
     
     while grid.running:
+        get_player_direction()
         clock.tick(60)
         screen.fill("black")
         grid.advance_frame()
