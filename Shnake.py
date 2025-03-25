@@ -26,6 +26,36 @@ grid_object = {
 # grid_object, int
     
 
+def set_player_direction():
+
+    global x_move
+    global y_move
+
+    for event in pygame.event.get():  # User did something
+        if event.type == pygame.QUIT:  # If user clicked close
+            global done
+            done = True  # Flag that we are done so we exit this loop
+
+
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_DOWN:
+                y_move = 1
+                x_move = 0
+            if event.key == pygame.K_UP:
+                y_move = -1
+                x_move = 0
+            if event.key == pygame.K_LEFT:
+                y_move = 0
+                x_move = -1
+            if event.key == pygame.K_RIGHT:
+                y_move = 0
+                x_move = 1
+
+    return (x_move, y_move)
+
+def get_player_direction():
+    return x_move, y_move
+
 class Grid:
     def __init__(self, width, height, speed):
         self.width = width
@@ -70,6 +100,7 @@ class Grid:
         
         
         while(direction == (0, 0)):
+            set_player_direction()
             temp = get_player_direction()
             if temp == (0, 0):
                 pass
@@ -89,14 +120,15 @@ class Grid:
         if len(free):
             chosenOne = random.choice(free)
             self.grid[chosenOne[0]][chosenOne[1]] = (grid_object['FOOD'], -1)
+            self.food = (chosenOne[0], chosenOne[1])
 
     def move_food(self):
-        print(self.food_on_timer, self.food_off_timer)
+        # print(self.food_on_timer, self.food_off_timer)
         if self.food_off_timer == 0:
             self.food_on_timer -= 1
             if self.food_on_timer <= 0:
-                self.food_off_timer = 100
-                self.food_on_timer = 10
+                self.food_off_timer = int(200 * random.random())
+                self.food_on_timer = int(20 * random.random())
 
             free = []
             search = [-1, 0, 1]
@@ -176,14 +208,13 @@ class Grid:
 
     def advance_frame(self):
         self.frame += 1
-        
+        player_direction = get_player_direction()
+        print(self.food)
         
         if self.running:
             self.move_food()
             if self.frame == self.speed:
-                global x_direction
-                global y_direction
-                player_direction = (x_direction, y_direction)
+                
 
                 x = self.snake_head[0]
                 y = self.snake_head[1]
@@ -233,34 +264,13 @@ class Grid:
 
         pygame.draw.rect(screen, (254, 100, 0), [self.snake_head[0]*pixel_width, self.snake_head[1]*pixel_width, pixel_width, pixel_width])
 
-def get_player_direction():
-
-    global x_direction
-    global y_direction
-
-    for event in pygame.event.get():  # User did something
-        if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_DOWN:
-                y_direction = 1
-                x_direction = 0
-            if event.key == pygame.K_UP:
-                y_direction = -1
-                x_direction = 0
-            if event.key == pygame.K_LEFT:
-                y_direction = 0
-                x_direction = -1
-            if event.key == pygame.K_RIGHT:
-                y_direction = 0
-                x_direction = 1
-
-    return (x_direction, y_direction)
 
 
 pixel_width = 20
 width = 30
 height = 30
-x_direction = 0
-y_direction = 0
+x_move = 0
+y_move = 0
 
 pygame.init()
 clock = pygame.time.Clock()
@@ -268,24 +278,19 @@ done = False
 
 screen = pygame.display.set_mode(((width * pixel_width), (height * pixel_width)))
    
-grid = Grid(width, height, 8)
+grid = Grid(width, height, 6)
 grid.start()
 
 while not done:
+    set_player_direction()
     
-    
-    while grid.running:
-        get_player_direction()
+    if grid.running:
         clock.tick(60)
         screen.fill("black")
         grid.advance_frame()
         pygame.display.update()
-        for event in pygame.event.get():  # User did something
-            if event.type == pygame.QUIT:  # If user clicked close
-                done = True  # Flag that we are done so we exit this loop
-                running = False
-
-    for event in pygame.event.get():  # User did something
-        if event.type == pygame.QUIT:  # If user clicked close
-            done = True  # Flag that we are done so we exit this loop
+        # for event in pygame.event.get():  # User did something
+        #     if event.type == pygame.QUIT:  # If user clicked close
+        #         done = True  # Flag that we are done so we exit this loop
+        #         running = False
             
