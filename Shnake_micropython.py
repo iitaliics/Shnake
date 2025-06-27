@@ -1,19 +1,9 @@
 import random
-import pygame
+import machine
+import neopixel
 
-"""
-Object of importance requiring abstraction:
-
-Score
-
-Play area - grid, stores positions and informs of interractions
-
-nake_segment - playable, stores the array of positions
-
-Food - Moves in the grid. Needs to know current populated positions. Needs to be consumed
-
-
-"""
+num = 2 * 8 * 32
+np = neopixel.NeoPixel(machine.Pin(38), num)
 
 # dict could be enum in c++
 grid_object = {
@@ -31,30 +21,31 @@ def set_player_direction():
     global x_move
     global y_move
 
-    for event in pygame.event.get():  # User did something
-        if event.type == pygame.QUIT:  # If user clicked close
-            global done
-            done = True  # Flag that we are done so we exit this loop
-
-
-        if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_DOWN:
-                y_move = 1
-                x_move = 0
-            if event.key == pygame.K_UP:
-                y_move = -1
-                x_move = 0
-            if event.key == pygame.K_LEFT:
-                y_move = 0
-                x_move = -1
-            if event.key == pygame.K_RIGHT:
-                y_move = 0
-                x_move = 1
+#     for event in pygame.event.get():  # User did something
+#         if event.type == pygame.QUIT:  # If user clicked close
+#             global done
+#             done = True  # Flag that we are done so we exit this loop
+# 
+# 
+#         if event.type == pygame.KEYDOWN:
+#             if event.key == pygame.K_DOWN:
+#                 y_move = 1
+#                 x_move = 0
+#             if event.key == pygame.K_UP:
+#                 y_move = -1
+#                 x_move = 0
+#             if event.key == pygame.K_LEFT:
+#                 y_move = 0
+#                 x_move = -1
+#             if event.key == pygame.K_RIGHT:
+#                 y_move = 0
+#                 x_move = 1
 
     return (x_move, y_move)
 
 def get_player_direction():
-    return x_move, y_move
+    return 1, 0
+#     return x_move, y_move
 
 class Grid:
     def __init__(self, width, height, speed):
@@ -63,8 +54,8 @@ class Grid:
         self.grid = [[(grid_object['NONE'], -1) for _ in range(height)] for _ in range(width)]
         self.running = False
 
-        x1, x2 = random.choices(range(self.width), k=2)
-        y1, y2 = random.choices(range(self.height), k=2)
+        x1, x2 = [random.choice(range(self.width)) for _ in range(2)]
+        y1, y2 = [random.choice(range(self.height)) for _ in range(2)]
 
         self.snake_head = (x1, y1)
         self.grid[x1][y1] = (grid_object['SNAKE'], 10)
@@ -96,8 +87,7 @@ class Grid:
     def start(self):
         direction = (0, 0)
         self.render()
-        pygame.display.update()
-        
+        np.write()
         
         while(direction == (0, 0)):
             set_player_direction()
@@ -250,20 +240,34 @@ class Grid:
 
         self.render()
         
+    def coord_to_np_index(self, x, y):
+        if y < 8:
+            if x % 2 == 0: #even
+                num = 8 * x + y
+            else:
+                num = 8 * x + (7 - y)
+        else:
+            if not x % 2 == 0: #even
+                num = 256 + 8 * (31 - x) + (7 - (y % 8))
+            else:
+                num = 256 + 8 * (31 - x) + (y % 8)
+                
+        return num
+        
     def render(self):
-        for column in range(self.width):
-            for row in range(self.height):
-                if self.grid[column][row][1] > 0:
-                    pygame.draw.rect(screen, (254, 0, 0), [column*pixel_width, row*pixel_width, pixel_width, pixel_width])
+        for y in range(self.height):
+            for x in range(self.width):
+                num = self.coord_to_np_index(x, y)
+                
 
-                elif self.grid[column][row][0] == grid_object["FOOD"]:
-                    pygame.draw.rect(screen, (0, 254, 0), [column*pixel_width, row*pixel_width, pixel_width, pixel_width])
-
+                if self.grid[x][y][0] == grid_object['FOOD']:
+                        np[num] = (0, 254, 0)
+                elif self.grid[x][y][0] == grid_object['SNAKE']:
+                    np[num] = (254, 0, 0)
                 else:
-                    pygame.draw.rect(screen, (0, 0, 0), [column*pixel_width, row*pixel_width, pixel_width, pixel_width])
-
-        pygame.draw.rect(screen, (254, 100, 0), [self.snake_head[0]*pixel_width, self.snake_head[1]*pixel_width, pixel_width, pixel_width])
-
+                    np[num] = (0, 0, 0)
+        np[self.coord_to_np_index(self.snake_head[0], self.snake_head[1])] = (254, 100, 0)
+    
 
 
 pixel_width = 20
@@ -272,25 +276,119 @@ height = 16
 x_move = 0
 y_move = 0
 
-pygame.init()
-clock = pygame.time.Clock()
+# pygame.init()
+# clock = pygame.time.Clock()
 done = False
 
-screen = pygame.display.set_mode(((width * pixel_width), (height * pixel_width)))
+# screen = pygame.display.set_mode(((width * pixel_width), (height * pixel_width)))
    
-grid = Grid(width, height, 6)
+grid = Grid(width, height, 2)
 grid.start()
 
 while not done:
     set_player_direction()
     
     if grid.running:
-        clock.tick(60)
-        screen.fill("black")
+        # clock.tick(60)
+        # screen.fill("black")
         grid.advance_frame()
-        pygame.display.update()
+        # pygame.display.update()
+
+        np.write()
         # for event in pygame.event.get():  # User did something
         #     if event.type == pygame.QUIT:  # If user clicked close
         #         done = True  # Flag that we are done so we exit this loop
         #         running = False
             
+
+
+"""
+def display(grid):
+    for y in range(grid.height):
+        # pygame.draw.line(screen, (40, 40, 40), [0, ypixelWidth], [grid.widthpixelWidth, ypixelWidth], 5)
+        for x in range(grid.width):
+            # if y == 0:
+            #     pygame.draw.line(screen, (40, 40, 40), [xpixelWidth, 0], [xpixelWidth, grid.heightpixelWidth], 5)
+            num = 0
+            material = grid.get(x, y)
+            if y < 8:
+                if x % 2 == 0: #even
+                    num = 8 * x + y
+                else:
+                    num = 8 * x + (7 - y)
+
+                if material.element.name == "air":
+                    np[num] = (0, 0, 0)
+                else:
+                    np[num] = (material.element.colour.r, material.element.colour.g, material.element.colour.b)
+            else:
+                if not x % 2 == 0: #even
+                    num = 256 + 8 * (31 - x) + (7 - (y % 8))
+                else:
+                    num = 256 + 8 * (31 - x) + (y % 8)
+                if material.element.name == "air":
+                    np[num] = (0, 0, 0)
+                else:
+                    np[num] = (material.element.colour.r, material.element.colour.g, material.element.colour.b)
+import machine, neopixel, time
+import random
+import math
+import gc
+num = 2 * 8 * 32
+np = neopixel.NeoPixel(machine.Pin(38), num)
+from machine import Pin, ADC
+import timedef render(self):
+        f
+
+led = Pin("LED", Pin.OUT)
+
+purple = 21 #left
+green = 27 # right
+yellow = 20 # top
+blue = 26 # bottom
+
+regulator_mode_pin = machine.Pin(23, machine.Pin.OUT)
+
+left = Pin(purple, Pin.OUT)
+right = Pin(green, Pin.OUT)
+top = ADC(Pin(blue))
+bot = Pin(yellow, Pin.IN)
+def getXTouch():
+    xHIGH = Pin(purple, Pin.OUT)
+    xLOW = Pin(green, Pin.OUT)
+    Pin(yellow, Pin.IN)
+
+    xHIGH.value(1)
+    xLOW.value(0)
+
+    time.sleep(0.020)  # Debounce delay
+    adc_value = ADC(Pin(blue)).read_u16()
+    return adc_value
+
+def getYTouch():
+    yHIGH = Pin(yellow, Pin.OUT)
+    yLOW = Pin(blue, Pin.OUT)
+    Pin(purple, Pin.IN)
+
+    yHIGH.value(1)
+    yLOW.value(0)
+
+    time.sleep(0.020)  # Debounce delay
+    adc_value = ADC(Pin(green)).read_u16()
+    return adc_value
+
+print("starting...")
+
+print("enter loop...")
+regulator_mode_pin.value(1)
+while True:
+    led.off()
+    x = getXTouch()
+    #time.sleep(0.1)
+    led.on()
+    y = getYTouch()
+    #time.sleep(0.1)
+    print("X:", x, "Y:", y)
+
+"""
+
