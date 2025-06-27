@@ -56,29 +56,18 @@ def set_player_direction():
 def get_player_direction():
     return x_move, y_move
 
+def reset_player_direction():
+    global x_move
+    global y_move
+    y_move = 0
+    x_move = 0
+
 class Grid:
     def __init__(self, width, height, speed):
         self.width = width
         self.height = height
-        self.grid = [[(grid_object['NONE'], -1) for _ in range(height)] for _ in range(width)]
-        self.running = False
-
-        x1, x2 = random.choices(range(self.width), k=2)
-        y1, y2 = random.choices(range(self.height), k=2)
-
-        self.snake_head = (x1, y1)
-        self.grid[x1][y1] = (grid_object['SNAKE'], 10)
-
-        # self.snake_head = (50, 100)
-        # self.grid[50][100] = (grid_object['SNAKE'], 5)
-
-        self.grid[x2][y2] = (grid_object['FOOD'], -1)
-        self.food = (x2, y2)
-        self.food_on_timer = 0
-        self.food_off_timer = 10
-
-        self.frame = 0
         self.speed = speed
+        self.reset()
 
         
     def in_bounds(self, x, y):
@@ -92,6 +81,27 @@ class Grid:
         
     def game_over(self):
         self.running = False
+        self.reset()
+        reset_player_direction()
+        self.start()
+
+    def reset(self):
+        self.grid = [[(grid_object['NONE'], -1) for _ in range(height)] for _ in range(width)]
+        self.running = False
+        x1, x2 = random.choices(range(self.width), k=2)
+        y1, y2 = random.choices(range(self.height), k=2)
+
+        self.snake_head = (x1, y1)
+        self.grid[x1][y1] = (grid_object['SNAKE'], 10)
+
+        # self.snake_head = (50, 100)
+        # self.grid[50][100] = (grid_object['SNAKE'], 5)
+
+        self.grid[x2][y2] = (grid_object['FOOD'], -1)
+        self.food = (x2, y2)
+        self.food_on_timer = 0
+        self.food_off_timer = 10
+        self.frame = 0
 
     def start(self):
         direction = (0, 0)
@@ -209,7 +219,7 @@ class Grid:
     def advance_frame(self):
         self.frame += 1
         player_direction = get_player_direction()
-        print(self.food)
+        # print(self.food)
         
         if self.running:
             self.move_food()
@@ -293,4 +303,6 @@ while not done:
         #     if event.type == pygame.QUIT:  # If user clicked close
         #         done = True  # Flag that we are done so we exit this loop
         #         running = False
+
+    # if not grid.running and (x_move, y_move) != get_player_direction():
             
