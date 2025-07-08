@@ -97,9 +97,45 @@ class Grid:
         if isinstance(snake, Snake):
             self.snake_list.append(snake) 
 
+    def cleanup_snake(self, snake):
+        if isinstance(snake, Snake):
+            x, y = snake.head
+            neighbour = (-1, 1)
+            # decrement body
+            for _ in range(int(snake.length/100 + 1)):
+                val = snake.length - (_ + 1) * 100
+                self.grid[x][y] = (grid_object["NONE"], -1)
+
+                next_x = x
+                next_y = y
+
+                for del_x in neighbour:
+                    if self.in_bounds(x + del_x, y):
+                        if self.grid[x + del_x][y][1] == val:
+                            next_x = x + del_x
+                            break
+                        
+
+                for del_y in neighbour:
+                    if self.in_bounds(x, y + del_y):
+                        if self.grid[x][y + del_y][1] == val:
+                            next_y = y + del_y
+                            break
+
+                if next_x == x and next_y == y:
+                    break
+                else:
+                    x = next_x
+                    y = next_y
+
     def reset_snake(self, snake):
         if isinstance(snake, Snake):
+            self.cleanup_snake(snake)
+
             snake.reset()
+            randx = random.choice(range(self.width))
+            randy = random.choice(range(self.height))
+            snake.head = (randx, randy)
 
         
     def in_bounds(self, x, y):
@@ -197,20 +233,24 @@ class Grid:
         x = snake.head[0] + x_direction
         y = snake.head[1] + y_direction
         if not self.in_bounds(x, y):
-            self.game_over()
-            return
+            # self.game_over()
+            self.reset_snake(snake)
+            return False
         
         if not self.running:
-            return
+            return False
 
         if self.grid[x][y][1] > 0:
-            self.game_over()
+            # self.game_over()
+            self.reset_snake(snake)
+            return False
         
         if self.grid[x][y][0] == grid_object["FOOD"]:
             # snake.grow(3.0)
-            snake.grow(3.0)
-            print("ATE")
+            snake.grow(300)
             self.respawn_food()
+            return True
+        return True
 
     def update_snake(self, x_direction, y_direction, snake):
         # update head
@@ -226,11 +266,10 @@ class Grid:
         snake.head = (snake.head[0] + x_direction, snake.head[1] + y_direction)
 
         neighbour = (-1, 1)
-        print("FRAME")
         # decrement body
-        for _ in range(int(size)):
-            val = size - _ - 1.0
-            if val >= 0 and val < 1.0:
+        for _ in range(int(size/100)):
+            val = size - (_ + 1) * 100
+            if val >= 0 and val < 100:
                 self.grid[x][y] = (grid_object["NONE"], -1)
                 break
             else:
@@ -239,13 +278,12 @@ class Grid:
             next_x = x
             next_y = y
 
-            print(val)
-
             for del_x in neighbour:
                 if self.in_bounds(x + del_x, y):
                     if self.grid[x + del_x][y][1] == val:
                         next_x = x + del_x
                         break
+                    
 
             for del_y in neighbour:
                 if self.in_bounds(x, y + del_y):
@@ -267,6 +305,7 @@ class Grid:
         self.frame += 1
         # print(self.food)
         
+        print("FRAME ",random.randint(0, 100))
         if self.running:
             self.move_food()
             if self.frame == self.speed:
@@ -284,13 +323,13 @@ class Grid:
                         
                     for del_x in neighbour:
                         if self.in_bounds(x + del_x, y):
-                            if self.grid[x + del_x][y][1] == size - 1.0:
+                            if self.grid[x + del_x][y][1] == size - 100:
                                 x = x + del_x
                                 break
 
                     for del_y in neighbour:
                         if self.in_bounds(x, y + del_y):
-                            if self.grid[x][y + del_y][1] == size - 1.0:
+                            if self.grid[x][y + del_y][1] == size - 100:
                                 y = y + del_y
                                 break
 
@@ -303,20 +342,27 @@ class Grid:
                         x_dir = player_direction[0]
                         y_dir = player_direction[1]
                         
-                    self.check_collision(x_dir, y_dir, snake)
-                    if self.running:
-                        self.update_snake(x_dir, y_dir, snake)
-                    self.frame = 0
+                    
+                    if not self.check_collision(x_dir, y_dir, snake):
+                        x_dir, y_dir = 0, 0
+                        # snake.length -= 100
 
+                    self.update_snake(x_dir, y_dir, snake)
+
+
+                    # if self.check_collision(x_dir, y_dir, snake):
+                    #     self.update_snake(x_dir, y_dir, snake)
+                    self.frame = 0
+        
         self.render()
         
     def render(self):
         for column in range(self.width):
             for row in range(self.height):
                 if self.grid[column][row][1] > 0:
-                    pygame.draw.rect(screen, (254, 0, 0), [column*pixel_width, row*pixel_width, pixel_width, pixel_width])
-                    if int(self.grid[column][row][1]) % 2 == 0:
-                        const = 255 / int(self.grid[column][row][1])
+                    # pygame.draw.rect(screen, (254, 0, 0), [column*pixel_width, row*pixel_width, pixel_width, pixel_width])
+                    if int(self.grid[column][row][1]/100) % 2 == 0:
+                        const = 255 / (int(self.grid[column][row][1])/100)
                     else:
                         const = 125
                     pygame.draw.rect(screen, (255 - const, 255 - const, 255 - const), [column*pixel_width, row*pixel_width, pixel_width, pixel_width])
@@ -424,9 +470,10 @@ def pathfind(goal_pos, current_pos, current_direction, depth):
     # All paths exhausted, dead end
 
 
-pixel_width = 10
-width = 32
-height = 16
+pixel_width = 1
+border_zone = 50
+width = 1000
+height = 500
 x_move = 0
 y_move = 0
 
@@ -436,11 +483,14 @@ done = False
 
 screen = pygame.display.set_mode(((width * pixel_width), (height * pixel_width)))
    
-snake1 = Snake(10.1)
-snake2 = Snake(10.6)
+snake1 = Snake(1001)
+snake2 = Snake(1002)
+snake3 = Snake(1003)
+snake4 = Snake(1004)
+
 
 # grid = Grid(width, height, 6, (snake1, snake2))
-grid = Grid(width, height, 6, (snake2, snake1))
+grid = Grid(width, height, 1, (snake2, snake1, snake3, snake4))
 grid.start()
 # grid.grid[7][0] = (grid_object['BARRIER'], -1)
 # grid.grid[5][1] = (grid_object['BARRIER'], -1)
@@ -449,7 +499,7 @@ grid.start()
 # grid.grid[6][-1] = (grid_object['BARRIER'], -1)
 
 
-print(pathfind((10, 0), (3, 1), (1, 0), 15))
+# print(pathfind((10, 0), (3, 1), (1, 0), 15))
 
 while not done:
 
