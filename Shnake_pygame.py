@@ -412,7 +412,7 @@ class Grid:
         food_x = self.food[0]
         food_y = self.food[1]
         # if food_x == 
-        print(food_x, food_y)
+        # print(food_x, food_y)
         pygame.draw.rect(screen, (0, 254, 0), [food_x*pixel_width, food_y*pixel_width, pixel_width, pixel_width])
 
                 # if self.grid[column][row][1] > 0:
@@ -539,6 +539,7 @@ done = False
 
 screen = pygame.display.set_mode(((width * pixel_width), (height * pixel_width)))
    
+# Digit positions 1 and 2 are the initial length (ie 10), and the last two positions are the snake ID
 snake1 = Snake(1001)
 snake2 = Snake(1002)
 snake3 = Snake(1003)
