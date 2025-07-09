@@ -71,13 +71,11 @@ def reset_player_direction():
 class Snake:
     def __init__(self, length):
         self.init_length = length
-        self.length = length
-        self.head = (15, 8)
-        self.direction = random.choice(((1, 0), (-1, 0), (0, 1), (0, -1)))
+        self.reset()
         
     def reset(self):
         self.length = self.init_length
-        self.direction = (0, 0)
+        self.direction = random.choice(((1, 0), (-1, 0), (0, 1), (0, -1)))
         self.head = None
 
     def grow(self, amount):
@@ -133,6 +131,7 @@ class Grid:
             self.cleanup_snake(snake)
 
             snake.reset()
+            
             randx = random.choice(range(self.width))
             randy = random.choice(range(self.height))
             snake.head = (randx, randy)
@@ -247,7 +246,7 @@ class Grid:
         
         if self.grid[x][y][0] == grid_object["FOOD"]:
             # snake.grow(3.0)
-            snake.grow(300)
+            snake.grow(1300)
             self.respawn_food()
             return True
         return True
@@ -297,6 +296,39 @@ class Grid:
                 x = next_x
                 y = next_y
 
+    def get_next_snake_segment(self, x, y, ascending):
+        next = 100 if ascending else -100
+
+        value = self.grid[x][y][1]
+        if not value > 0:
+            return (-1, -1), -1
+
+        val = value + next
+
+        next_x = x
+        next_y = y
+
+        neighbour = (-1, 1)
+
+        for del_x in neighbour:
+            if self.in_bounds(x + del_x, y):
+                if self.grid[x + del_x][y][1] == val:
+                    next_x = x + del_x
+                    break
+                
+
+        for del_y in neighbour:
+            if self.in_bounds(x, y + del_y):
+                if self.grid[x][y + del_y][1] == val:
+                    next_y = y + del_y
+                    break
+
+        if next_x == x and next_y == y:
+            return (-1, -1), -1
+        else:
+            return ((next_x, next_y), val)
+
+
     def update_snake_direction(self, snake):
         snake.direction = pathfind(self.food, snake.head, snake.direction, 15)
         # return (x_move, y_move)
@@ -305,11 +337,21 @@ class Grid:
         self.frame += 1
         # print(self.food)
         
-        print("FRAME ",random.randint(0, 100))
+        # print("FRAME ",random.randint(0, 100))
         if self.running:
             self.move_food()
             if self.frame == self.speed:
-                
+                coords = self.snake_list[0].head[0], self.snake_list[0].head[1]
+                # for iter in range(int(self.snake_list[0].length / 100)-1):
+
+                #     coords, val = self.get_next_snake_segment(coords[0], coords[1], False)
+                #     print("descend", coords[0], coords[1], (self.snake_list[0].length / 100), val)
+
+                # for iter in range(int(self.snake_list[0].length / 100) - 1):
+
+                #     coords, val = self.get_next_snake_segment(coords[0], coords[1], True)
+                #     print("ascend", coords[0], coords[1], (self.snake_list[0].length / 100), val)
+
                 for snake in self.snake_list:
                     self.update_snake_direction(snake)
                     player_direction = snake.direction
@@ -357,21 +399,35 @@ class Grid:
         self.render()
         
     def render(self):
-        for column in range(self.width):
-            for row in range(self.height):
-                if self.grid[column][row][1] > 0:
+        screen.fill((0, 0, 0))
+        for snake in self.snake_list:
+            coords = snake.head
+            val = int(snake.length / 100)
+            for iter in range(val - 1):
+                const = 1
+                pygame.draw.rect(screen, (255 - const, 255 - const, 255 - const), [coords[0]*pixel_width, coords[1]*pixel_width, pixel_width, pixel_width])
+                coords, val = self.get_next_snake_segment(coords[0], coords[1], False)
+                #     print("descend", coords[0], coords[1], (self.snake_list[0].length / 100), val)
+
+        food_x = self.food[0]
+        food_y = self.food[1]
+        # if food_x == 
+        print(food_x, food_y)
+        pygame.draw.rect(screen, (0, 254, 0), [food_x*pixel_width, food_y*pixel_width, pixel_width, pixel_width])
+
+                # if self.grid[column][row][1] > 0:
                     # pygame.draw.rect(screen, (254, 0, 0), [column*pixel_width, row*pixel_width, pixel_width, pixel_width])
-                    if int(self.grid[column][row][1]/100) % 2 == 0:
-                        const = 255 / (int(self.grid[column][row][1])/100)
-                    else:
-                        const = 125
-                    pygame.draw.rect(screen, (255 - const, 255 - const, 255 - const), [column*pixel_width, row*pixel_width, pixel_width, pixel_width])
+                    # if int(self.grid[column][row][1]/100) % 2 == 0:
+                    #     const = 255 / (int(self.grid[column][row][1])/100)
+                    # else:
+                    #     const = 125
+                    # pygame.draw.rect(screen, (255 - const, 255 - const, 255 - const), [column*pixel_width, row*pixel_width, pixel_width, pixel_width])
 
-                elif self.grid[column][row][0] == grid_object["FOOD"]:
-                    pygame.draw.rect(screen, (0, 254, 0), [column*pixel_width, row*pixel_width, pixel_width, pixel_width])
+                # if self.grid[column][row][0] == grid_object["FOOD"]:
+                #     pygame.draw.rect(screen, (0, 254, 0), [column*pixel_width, row*pixel_width, pixel_width, pixel_width])
 
-                else:
-                    pygame.draw.rect(screen, (0, 0, 0), [column*pixel_width, row*pixel_width, pixel_width, pixel_width])
+                # else:
+                #     pygame.draw.rect(screen, (0, 0, 0), [column*pixel_width, row*pixel_width, pixel_width, pixel_width])
         for snake in self.snake_list:
             pygame.draw.rect(screen, (254, 100, 0), [snake.head[0]*pixel_width, snake.head[1]*pixel_width, pixel_width, pixel_width])
 
@@ -470,10 +526,10 @@ def pathfind(goal_pos, current_pos, current_direction, depth):
     # All paths exhausted, dead end
 
 
-pixel_width = 1
+pixel_width = 10
 border_zone = 50
-width = 1000
-height = 500
+width = 200
+height = 100
 x_move = 0
 y_move = 0
 
@@ -487,10 +543,18 @@ snake1 = Snake(1001)
 snake2 = Snake(1002)
 snake3 = Snake(1003)
 snake4 = Snake(1004)
+snake11 = Snake(1004)
+snake21 = Snake(1006)
+snake31 = Snake(1007)
+snake41 = Snake(1008)
+snake12 = Snake(1009)
+snake22 = Snake(1010)
+snake32 = Snake(1011)
+snake42 = Snake(1012)
 
 
 # grid = Grid(width, height, 6, (snake1, snake2))
-grid = Grid(width, height, 1, (snake2, snake1, snake3, snake4))
+grid = Grid(width, height, 1, (snake2, snake1, snake3, snake4, snake21, snake11, snake31, snake41, snake22, snake12, snake32, snake42))
 grid.start()
 # grid.grid[7][0] = (grid_object['BARRIER'], -1)
 # grid.grid[5][1] = (grid_object['BARRIER'], -1)
