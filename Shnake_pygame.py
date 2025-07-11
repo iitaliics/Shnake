@@ -399,6 +399,27 @@ class Grid:
         self.render()
         
     def render(self):
+        for column in range(self.width):
+            for row in range(self.height):
+                if self.grid[column][row][1] > 0:
+                    # pygame.draw.rect(screen, (254, 0, 0), [column*pixel_width, row*pixel_width, pixel_width, pixel_width])
+                    if int(self.grid[column][row][1]/100) % 2 == 0:
+                        const = 255 / (int(self.grid[column][row][1])/100)
+                    else:
+                        const = 125
+                    pygame.draw.rect(screen, (255 - const, 255 - const, 255 - const), [column*pixel_width, row*pixel_width, pixel_width, pixel_width])
+
+                elif self.grid[column][row][0] == grid_object["FOOD"]:
+                    pygame.draw.rect(screen, (0, 254, 0), [column*pixel_width, row*pixel_width, pixel_width, pixel_width])
+
+                elif self.grid[column][row][0] == grid_object["BARRIER"]:
+                    pygame.draw.rect(screen, (254, 154, 50), [column*pixel_width, row*pixel_width, pixel_width, pixel_width])
+                # else:
+                #     pygame.draw.rect(screen, (0, 0, 0), [column*pixel_width, row*pixel_width, pixel_width, pixel_width])
+        for snake in self.snake_list:
+            pygame.draw.rect(screen, (254, 100, 0), [snake.head[0]*pixel_width, snake.head[1]*pixel_width, pixel_width, pixel_width])
+
+    def render_new(self):
         screen.fill((0, 0, 0))
         for snake in self.snake_list:
             coords = snake.head
@@ -439,7 +460,21 @@ class Grid:
     def find_goal_position(self):
         return self.food
 
-    
+    def create_obstacle(self, spawn_point, direction, coords_list):
+        for coords in coords_list:
+            if direction == (1, 0):
+                x, y = spawn_point[0] + coords[0] ,spawn_point[1] + coords[1]
+            elif direction == (0, 1):
+                y, x = spawn_point[0] + coords[0] ,spawn_point[1] + coords[1]
+            elif direction == (-1, 0):
+                x, y = spawn_point[0] - coords[0] ,spawn_point[1] + coords[1]
+            elif direction == (0, -1):
+                y, x = spawn_point[0] - coords[0] ,spawn_point[1] - coords[1]
+            else:
+                return
+            if self.in_bounds(x, y):
+                self.grid[x][y] = (grid_object["BARRIER"], 0)
+
 
 
     # def find_closest_direction(self, goal_pos, current_pos, direction):
@@ -525,8 +560,7 @@ def pathfind(goal_pos, current_pos, current_direction, depth):
     return (-1, -1)
     # All paths exhausted, dead end
 
-
-pixel_width = 10
+pixel_width = 8
 border_zone = 50
 width = 200
 height = 100
@@ -556,6 +590,22 @@ snake42 = Snake(1012)
 
 # grid = Grid(width, height, 6, (snake1, snake2))
 grid = Grid(width, height, 1, (snake2, snake1, snake3, snake4, snake21, snake11, snake31, snake41, snake22, snake12, snake32, snake42))
+
+
+obstacle_1 = (
+    (0, 0), (1, 0), (2, 0), (3, 0), (3, 1), (3, 2), (3, 3), (2, 3), (1, 3), (0, 3), (0, 2)
+)
+grid.create_obstacle((5, 5), (1, 0), obstacle_1)
+grid.create_obstacle((25, 25), (-1, 0), obstacle_1)
+
+grid.create_obstacle((15, 15), (0, 1), obstacle_1)
+
+grid.create_obstacle((51, 51), (0, -1), obstacle_1)
+
+
+for x in range(int(height / 2)):
+    grid.grid[int(width / 2)][x] = (grid_object["BARRIER"], -1)
+
 grid.start()
 # grid.grid[7][0] = (grid_object['BARRIER'], -1)
 # grid.grid[5][1] = (grid_object['BARRIER'], -1)
