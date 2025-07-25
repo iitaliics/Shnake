@@ -24,6 +24,9 @@ grid_object = {
     "BARRIER": 4
 }
 
+regular_food_amount = 1300
+dead_snake_food_amount = 100
+
 # struct space_data
 # grid_object, int
     
@@ -59,7 +62,7 @@ def set_player_direction():
 def get_player_direction():
     global x_move
     global y_move
-    (x_move, y_move) = pathfind(grid.food, grid.snake.head, (x_move, y_move), 15)
+    
     return (x_move, y_move)
 
 def reset_player_direction():
@@ -69,14 +72,20 @@ def reset_player_direction():
     x_move = 0
 
 class Snake:
-    def __init__(self, length):
+    def __init__(self, length, scale = 1):
         self.init_length = length
+        self.scale = scale
         self.reset()
         
     def reset(self):
         self.length = self.init_length
         self.direction = random.choice(((1, 0), (-1, 0), (0, 1), (0, -1)))
         self.head = None
+        self.goal_pos = None
+        self.hunt = False
+        self.hunt_timeout = 0
+        self.hunt_timeout_limit = 100
+        self.scale = 1
 
     def grow(self, amount):
         self.length += amount
@@ -103,6 +112,7 @@ class Grid:
             for _ in range(int(snake.length/100 + 1)):
                 val = snake.length - (_ + 1) * 100
                 self.grid[x][y] = (grid_object["NONE"], -1)
+                # self.grid[x][y] = (grid_object["FOOD"], 100)
 
                 next_x = x
                 next_y = y
@@ -132,9 +142,13 @@ class Grid:
 
             snake.reset()
             
-            randx = random.choice(range(self.width))
-            randy = random.choice(range(self.height))
-            snake.head = (randx, randy)
+            free = self.list_free_coordinates()
+            snake.head = random.choice(free)
+
+            offset_x = random.choice(range(-15, 16))
+            offset_y = random.choice(range(-15, 16))
+
+            snake.goal_pos = (snake.head[0] + offset_x, snake.head[1] + offset_y)
 
         
     def in_bounds(self, x, y):
@@ -159,16 +173,21 @@ class Grid:
         snake_list_length = len(self.snake_list)
         randx = random.choices(range(self.width), k=snake_list_length + 1)
         randy = random.choices(range(self.height), k=snake_list_length + 1)
+        offset_x = random.choices(range(-15, 16), k=snake_list_length + 1)
+        offset_y = random.choices(range(-15, 16), k=snake_list_length + 1)
+
+
         for idx, snake in enumerate(self.snake_list):
                 snake.head = (randx[idx], randy[idx])
                 snake.length = snake.init_length
+                snake.goal_pos = (randx[idx] + offset_x[idx], randy[idx] + offset_y[idx])
 
         # self.snake_head = (50, 100)
         # self.grid[50][100] = (grid_object['SNAKE'], 5)
         x2 = randx[snake_list_length-1]
         y2 = randy[snake_list_length-1]
 
-        self.grid[x2][y2] = (grid_object['FOOD'], -1)
+        self.grid[x2][y2] = (grid_object['FOOD'], regular_food_amount)
         self.food = (x2, y2)
         self.food_on_timer = 0
         self.food_off_timer = 10
@@ -190,25 +209,29 @@ class Grid:
         grid.running = True
         # self.update_snake(direction[0], direction[1], self.snake_list[0]) 
         
+    def list_free_coordinates(self):
+        coords = []
+        for x in range(width):
+            for y in range(height):
+                if self.grid[x][y][0] == grid_object["NONE"]:
+                    coords.append((x, y))
+        return coords
 
+    
 
     def respawn_food(self):
-        free = []
-        for column in range(self.width):
-            for row in range(self.height):
-                if not self.grid[column][row][1] > 0:
-                    free.append((column, row))
+        free = self.list_free_coordinates()
         if len(free):
             chosenOne = random.choice(free)
-            self.grid[chosenOne[0]][chosenOne[1]] = (grid_object['FOOD'], -1)
+            self.grid[chosenOne[0]][chosenOne[1]] = (grid_object['FOOD'], regular_food_amount)
             self.food = (chosenOne[0], chosenOne[1])
 
     def move_food(self):
-        # print(self.food_on_timer, self.food_off_timer)
+        print(self.food_on_timer, self.food_off_timer)
         if self.food_off_timer == 0:
             self.food_on_timer -= 1
             if self.food_on_timer <= 0:
-                self.food_off_timer = int(200 * random.random())
+                self.food_off_timer = int(100 * random.random())
                 self.food_on_timer = int(20 * random.random())
 
             free = []
@@ -216,13 +239,13 @@ class Grid:
             for column in search:
                 for row in search:
                     if self.in_bounds(self.food[0] + column, self.food[1] + row):
-                        if not self.grid[self.food[0] + column][self.food[1] + row][1] > 0:
+                        if self.grid[self.food[0] + column][self.food[1] + row][0] == grid_object["NONE"]:
                             free.append((self.food[0] + column, self.food[1] + row))
             if len(free):
                 chosenOne = random.choice(free)
-                self.grid[self.food[0]][self.food[1]] = (grid_object['NONE'], -1)
+                self.grid[self.food[0]][self.food[1]] = (grid_object['NONE'], 0)
                 self.food = (chosenOne[0], chosenOne[1])
-                self.grid[chosenOne[0]][chosenOne[1]] = (grid_object['FOOD'], -1)
+                self.grid[chosenOne[0]][chosenOne[1]] = (grid_object['FOOD'], regular_food_amount)
         else:
             self.food_off_timer -= 1
         
@@ -239,19 +262,19 @@ class Grid:
         if not self.running:
             return False
 
-        if self.grid[x][y][1] > 0:
+        if self.grid[x][y][0] == grid_object["BARRIER"] or self.grid[x][y][0] == grid_object["ENEMY_SNAKE"]:
             # self.game_over()
             self.reset_snake(snake)
             return False
         
         if self.grid[x][y][0] == grid_object["FOOD"]:
             # snake.grow(3.0)
-            snake.grow(1300)
+            snake.grow(self.grid[x][y][1])
             self.respawn_food()
             return True
         return True
 
-    def update_snake(self, x_direction, y_direction, snake):
+    def update_snake(self, x_direction, y_direction, snake, is_player):
         # update head
         x = snake.head[0]
         y = snake.head[1]
@@ -261,7 +284,10 @@ class Grid:
 
         size = snake.length
 
-        self.grid[snake.head[0] + x_direction][snake.head[1] + y_direction] = (grid_object["ENEMY_SNAKE"], size)
+        if is_player:
+            self.grid[snake.head[0] + x_direction][snake.head[1] + y_direction] = (grid_object["SNAKE"], size)
+        else:
+            self.grid[snake.head[0] + x_direction][snake.head[1] + y_direction] = (grid_object["ENEMY_SNAKE"], size)
         snake.head = (snake.head[0] + x_direction, snake.head[1] + y_direction)
 
         neighbour = (-1, 1)
@@ -272,7 +298,10 @@ class Grid:
                 self.grid[x][y] = (grid_object["NONE"], -1)
                 break
             else:
-                self.grid[x][y] = (grid_object["ENEMY_SNAKE"], val)
+                if is_player:
+                    self.grid[x][y] = (grid_object["SNAKE"], val)
+                else:
+                    self.grid[x][y] = (grid_object["ENEMY_SNAKE"], val)
 
             next_x = x
             next_y = y
@@ -329,31 +358,24 @@ class Grid:
             return ((next_x, next_y), val)
 
 
-    def update_snake_direction(self, snake):
-        snake.direction = pathfind(self.food, snake.head, snake.direction, 15)
-        # return (x_move, y_move)
-
     def advance_frame(self):
         self.frame += 1
+        set_player_direction()
+        print(self.snake_list[0].direction)
         # print(self.food)
         
         # print("FRAME ",random.randint(0, 100))
         if self.running:
             self.move_food()
             if self.frame == self.speed:
-                coords = self.snake_list[0].head[0], self.snake_list[0].head[1]
-                # for iter in range(int(self.snake_list[0].length / 100)-1):
-
-                #     coords, val = self.get_next_snake_segment(coords[0], coords[1], False)
-                #     print("descend", coords[0], coords[1], (self.snake_list[0].length / 100), val)
-
-                # for iter in range(int(self.snake_list[0].length / 100) - 1):
-
-                #     coords, val = self.get_next_snake_segment(coords[0], coords[1], True)
-                #     print("ascend", coords[0], coords[1], (self.snake_list[0].length / 100), val)
+                player = True
 
                 for snake in self.snake_list:
-                    self.update_snake_direction(snake)
+                    if player:
+                        snake.direction = get_player_direction()
+                    else:
+                        self.find_goal_position(snake)
+                        snake.direction = pathfind(snake.goal_pos, snake.head, snake.direction, 15)
                     player_direction = snake.direction
                     # print(player_direction)s
                     x = snake.head[0]
@@ -384,40 +406,59 @@ class Grid:
                         x_dir = player_direction[0]
                         y_dir = player_direction[1]
                         
-                    
                     if not self.check_collision(x_dir, y_dir, snake):
                         x_dir, y_dir = 0, 0
                         # snake.length -= 100
 
-                    self.update_snake(x_dir, y_dir, snake)
+                    self.update_snake(x_dir, y_dir, snake, player)
 
 
                     # if self.check_collision(x_dir, y_dir, snake):
                     #     self.update_snake(x_dir, y_dir, snake)
-                    self.frame = 0
+                    if player:
+                        player = False
+                self.frame = 0
+                    
         
         self.render()
         
     def render(self):
+
+        player_offset = (self.snake_list[0].head[0] + self.width / 2, self.snake_list[0].head[1] + self.height / 2 )
+
         for column in range(self.width):
             for row in range(self.height):
-                if self.grid[column][row][1] > 0:
+                if self.grid[column][row][0] == grid_object["SNAKE"]:
                     # pygame.draw.rect(screen, (254, 0, 0), [column*pixel_width, row*pixel_width, pixel_width, pixel_width])
                     if int(self.grid[column][row][1]/100) % 2 == 0:
                         const = 255 / (int(self.grid[column][row][1])/100)
                     else:
                         const = 125
-                    pygame.draw.rect(screen, (255 - const, 255 - const, 255 - const), [column*pixel_width, row*pixel_width, pixel_width, pixel_width])
+                    pygame.draw.rect(screen, (255 - const, 255 - const, 255 - const), [((column - player_offset[0])%self.width)*pixel_width, ((row - player_offset[1])%self.height) *pixel_width, pixel_width, pixel_width])
+
+                elif self.grid[column][row][0] == grid_object["ENEMY_SNAKE"]:
+                    # pygame.draw.rect(screen, (254, 0, 0), [column*pixel_width, row*pixel_width, pixel_width, pixel_width])
+                    if int(self.grid[column][row][1]/100) % 2 == 0:
+                        const = 255 / (int(self.grid[column][row][1])/100)
+                    else:
+                        const = 125
+                    pygame.draw.rect(screen, (255 - const, 255 - const, 255 - const), [((column - player_offset[0])%self.width)*pixel_width, ((row - player_offset[1])%self.height) *pixel_width, pixel_width, pixel_width])
 
                 elif self.grid[column][row][0] == grid_object["FOOD"]:
-                    pygame.draw.rect(screen, (0, 254, 0), [column*pixel_width, row*pixel_width, pixel_width, pixel_width])
+                    pygame.draw.rect(screen, (0, 254, 0), [((column - player_offset[0])%self.width)*pixel_width, ((row - player_offset[1])%self.height) *pixel_width, pixel_width, pixel_width])
 
                 elif self.grid[column][row][0] == grid_object["BARRIER"]:
-                    pygame.draw.rect(screen, (254, 154, 50), [column*pixel_width, row*pixel_width, pixel_width, pixel_width])
+                    pygame.draw.rect(screen, (254, 154, 50), [((column - player_offset[0])%self.width)*pixel_width, ((row - player_offset[1])%self.height) *pixel_width, pixel_width, pixel_width])
                 # else:
                 #     pygame.draw.rect(screen, (0, 0, 0), [column*pixel_width, row*pixel_width, pixel_width, pixel_width])
+        player = True
         for snake in self.snake_list:
-            pygame.draw.rect(screen, (254, 100, 0), [snake.head[0]*pixel_width, snake.head[1]*pixel_width, pixel_width, pixel_width])
+            if player:
+                pygame.draw.rect(screen, (254, 100, 125), [((snake.head[0] - player_offset[0])%self.width)*pixel_width, ((snake.head[1] - player_offset[1])%self.height)*pixel_width, pixel_width, pixel_width])
+                player = False
+            else:
+
+                pygame.draw.rect(screen, (254, 100, 0), [((snake.head[0] - player_offset[0])%self.width)*pixel_width, ((snake.head[1] - player_offset[1])%self.height)*pixel_width, pixel_width, pixel_width])
 
     def render_new(self):
         screen.fill((0, 0, 0))
@@ -452,28 +493,64 @@ class Grid:
         for snake in self.snake_list:
             pygame.draw.rect(screen, (254, 100, 0), [snake.head[0]*pixel_width, snake.head[1]*pixel_width, pixel_width, pixel_width])
 
-    def hunt(self):
-        goal_pos = self.find_goal_position()
-        current_pos = self.snake_head
-        direction = self.pathfind(goal_pos, current_pos)
+    def is_close_to_food(self, snake):
+        if self.in_bounds(snake.goal_pos[0], snake.goal_pos[1]) and self.grid[snake.goal_pos[0]][snake.goal_pos[1]][0] == grid_object["FOOD"]:
+            return snake.goal_pos 
+        for front_search in range(1, 20):
+            for side_seach in range (-15, 16):
+                if not snake.direction[0] == 0:
+                    search_x = snake.head[0] + snake.direction[0] * front_search
+                    search_y = snake.head[1] + side_seach
+                else:
+                    search_x = snake.head[0] + side_seach
+                    search_y = snake.head[1] + snake.direction[1] * front_search
 
-    def find_goal_position(self):
-        return self.food
+                if self.in_bounds(search_x, search_y) and self.grid[search_x][search_y][0] == grid_object["FOOD"]:
+                    snake.hunt = True
+                    return (search_x, search_y)
+        return snake.goal_pos
 
-    def create_obstacle(self, spawn_point, direction, coords_list):
+
+    def find_goal_position(self, snake):
+        snake.hunt_timeout += 1
+        
+        snake.goal_pos = self.is_close_to_food(snake)
+
+        if snake.hunt:
+            if snake.head == snake.goal_pos or not self.in_bounds(snake.goal_pos[0], snake.goal_pos[1]) or snake.hunt_timeout >= snake.hunt_timeout_limit * 2:
+                snake.hunt = False
+                snake.hunt_timeout = 0
+                offset_x = random.choice(range(-30, 31))
+                offset_y = random.choice(range(-30, 31))
+                snake.goal_pos = (snake.head[0] + offset_x, snake.head[1] + offset_y)
+
+        else:
+            if snake.head == snake.goal_pos or not self.in_bounds(snake.goal_pos[0], snake.goal_pos[1]) or snake.hunt_timeout >= snake.hunt_timeout_limit:
+                offset_x = random.choice(range(-30, 31))
+                offset_y = random.choice(range(-30, 31))
+                snake.hunt_timeout = 0
+
+                snake.goal_pos = (snake.head[0] + offset_x, snake.head[1] + offset_y)
+
+    def create_obstacle(self, spawn_point, direction, coords_list, scale = 1):
         for coords in coords_list:
-            if direction == (1, 0):
-                x, y = spawn_point[0] + coords[0] ,spawn_point[1] + coords[1]
-            elif direction == (0, 1):
-                y, x = spawn_point[0] + coords[0] ,spawn_point[1] + coords[1]
-            elif direction == (-1, 0):
-                x, y = spawn_point[0] - coords[0] ,spawn_point[1] + coords[1]
-            elif direction == (0, -1):
-                y, x = spawn_point[0] - coords[0] ,spawn_point[1] - coords[1]
-            else:
-                return
-            if self.in_bounds(x, y):
-                self.grid[x][y] = (grid_object["BARRIER"], 0)
+            for scale_x in range(scale):
+                for scale_y in range(scale):
+                    scaled_coords_x = coords[0] * scale + scale_x
+                    scaled_coords_y = coords[1] * scale + scale_y
+
+                    if direction == (1, 0):
+                        x, y = spawn_point[0] + scaled_coords_x ,spawn_point[1] + scaled_coords_y
+                    elif direction == (0, 1):
+                        y, x = spawn_point[0] + scaled_coords_x ,spawn_point[1] + scaled_coords_y
+                    elif direction == (-1, 0):
+                        x, y = spawn_point[0] - scaled_coords_x ,spawn_point[1] + scaled_coords_y
+                    elif direction == (0, -1):
+                        y, x = spawn_point[0] - scaled_coords_x ,spawn_point[1] - scaled_coords_y
+                    else:
+                        return
+                    if self.in_bounds(x, y):
+                        self.grid[x][y] = (grid_object["BARRIER"], 0)
 
 
 
@@ -578,7 +655,7 @@ snake1 = Snake(1001)
 snake2 = Snake(1002)
 snake3 = Snake(1003)
 snake4 = Snake(1004)
-snake11 = Snake(1004)
+snake11 = Snake(1005)
 snake21 = Snake(1006)
 snake31 = Snake(1007)
 snake41 = Snake(1008)
@@ -589,18 +666,18 @@ snake42 = Snake(1012)
 
 
 # grid = Grid(width, height, 6, (snake1, snake2))
-grid = Grid(width, height, 1, (snake2, snake1, snake3, snake4, snake21, snake11, snake31, snake41, snake22, snake12, snake32, snake42))
+grid = Grid(width, height, 6, (snake2, snake1, snake3, snake4, snake21, snake11, snake31, snake41, snake22, snake12, snake32, snake42))
 
 
 obstacle_1 = (
     (0, 0), (1, 0), (2, 0), (3, 0), (3, 1), (3, 2), (3, 3), (2, 3), (1, 3), (0, 3), (0, 2)
 )
-grid.create_obstacle((5, 5), (1, 0), obstacle_1)
-grid.create_obstacle((25, 25), (-1, 0), obstacle_1)
+grid.create_obstacle((5, 5), (1, 0), obstacle_1, 1)
+grid.create_obstacle((25, 25), (-1, 0), obstacle_1, 2)
 
-grid.create_obstacle((15, 15), (0, 1), obstacle_1)
+grid.create_obstacle((15, 15), (0, 1), obstacle_1, 3)
 
-grid.create_obstacle((51, 51), (0, -1), obstacle_1)
+grid.create_obstacle((51, 51), (0, -1), obstacle_1, 4)
 
 
 for x in range(int(height / 2)):
@@ -627,10 +704,10 @@ while not done:
         grid.advance_frame()
         pygame.display.update()
 
-    for event in pygame.event.get():  # User did something
-        if event.type == pygame.QUIT:  # If user clicked close
-            done = True  # Flag that we are done so we exit this loop
-            running = False
+    # for event in pygame.event.get():  # User did something
+    #     if event.type == pygame.QUIT:  # If user clicked close
+    #         done = True  # Flag that we are done so we exit this loop
+    #         running = False
 
     # if not grid.running and (x_move, y_move) != get_player_direction():
             
